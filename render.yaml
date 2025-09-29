@@ -1,23 +1,14 @@
 services:
-services:
   - type: web
     name: youtube-telegram-bot
     env: python
     plan: free
-    buildCommand: |
-      python -m pip install --upgrade pip
-      pip install -r requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: python bot.py
     envVars:
       - key: BOT_TOKEN
         sync: false
-        description: "Telegram Bot Token from BotFather"
       - key: WEBHOOK_URL
         sync: false
-        description: "Your Render app URL (e.g., https://your-app.onrender.com)"
       - key: PORT
         value: 10000
-      - key: PYTHON_VERSION
-        value: 3.11.0
-    healthCheckPath: /health
-    autoDeploy: true
