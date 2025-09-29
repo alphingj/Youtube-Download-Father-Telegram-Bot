@@ -1,12 +1,13 @@
 services:
+services:
   - type: web
     name: youtube-telegram-bot
     env: python
     plan: free
     buildCommand: |
-      pip install --upgrade pip
+      python -m pip install --upgrade pip
       pip install -r requirements.txt
-    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120 bot:app
+    startCommand: python bot.py
     envVars:
       - key: BOT_TOKEN
         sync: false
@@ -20,7 +21,3 @@ services:
         value: 3.11.0
     healthCheckPath: /health
     autoDeploy: true
-    disk:
-      name: downloads
-      mountPath: /opt/render/project/src/downloads
-      sizeGB: 1
