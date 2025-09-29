@@ -3,12 +3,24 @@ services:
     name: youtube-telegram-bot
     env: python
     plan: free
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn bot:app
+    buildCommand: |
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: gunicorn --bind 0.0.0.0:$PORT --workers 2 --threads 4 --timeout 120 bot:app
     envVars:
       - key: BOT_TOKEN
         sync: false
+        description: "Telegram Bot Token from BotFather"
       - key: WEBHOOK_URL
         sync: false
+        description: "Your Render app URL (e.g., https://your-app.onrender.com)"
+      - key: PORT
+        value: 10000
       - key: PYTHON_VERSION
         value: 3.11.0
+    healthCheckPath: /health
+    autoDeploy: true
+    disk:
+      name: downloads
+      mountPath: /opt/render/project/src/downloads
+      sizeGB: 1
