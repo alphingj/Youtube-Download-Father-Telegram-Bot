@@ -1,108 +1,76 @@
-const express = require("express");
-const TelegramBot = require("node-telegram-bot-api");
-const ytdl = require("ytdl-core");
-const FileType = require("file-type");
-const streamBuffers = require("stream-buffers");
+const express = require('express');
+const TelegramBot = require('node-telegram-bot-api');
+const ytdl = require('ytdl-core');
+const fetch = require('node-fetch');
+const fs = require('fs');
+const path = require('path');
+const { PassThrough } = require('stream');
 
-const TOKEN = process.env.BOT_TOKEN;
-if (!TOKEN) {
-  console.error("❌ BOT_TOKEN is missing!");
-  process.exit(1);
-}
-
-const bot = new TelegramBot(TOKEN, { polling: true });
-
-// Express for uptime ping
 const app = express();
-app.get("/", (req, res) => res.send("✅ Bot is running!"));
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🌐 Express listening on port ${PORT}`));
+const port = process.env.PORT || 3000;
+const botToken = process.env.BOT_TOKEN;
+const bot = new TelegramBot(botToken, { polling: false });
 
-bot.on("message", async (msg) => {
+const webhookUrl = `https://api.telegram.org/bot${botToken}/setWebhook?url=https://your-app.onrender.com/bot${botToken}`;
+fetch(webhookUrl)
+  .then(() => console.log('Webhook set successfully'))
+  .catch(err => console.error('Error setting webhook:', err));
+
+app.use(`/bot${botToken}`, express.json(), (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
+
+bot.onText(/https:\/\/www\.youtube\.com\/watch\?v=(\S+)/, async (msg, match) => {
   const chatId = msg.chat.id;
-  const url = msg.text;
+  const url = match[0];
+  const info = await ytdl.getInfo(url);
+  const title = info.videoDetails.title;
 
-  if (!url || !url.includes("youtube.com")) {
-    return bot.sendMessage(chatId, "❌ Send a valid YouTube link.");
-  }
+  const videoStream = ytdl(url, { filter: 'audioandvideo', quality: 'highest' });
+  const fileSize = await getFileSize(videoStream);
 
-  try {
-    const info = await ytdl.getInfo(url);
-    const title = info.videoDetails.title.replace(/[^\w\s]/gi, "") || "video";
-
-    // Send initial message
-    const statusMessage = await bot.sendMessage(chatId, `📥 Downloading "${title}"... 0%`);
-
-    // Stream video
-    const videoStream = ytdl(url, { filter: "audioandvideo", quality: "highest" });
-    const totalSize = parseInt(info.videoDetails.lengthSeconds) || 0; // in seconds for reference
-    let downloadedBytes = 0;
-
-    const bufferStream = new streamBuffers.WritableStreamBuffer();
-
-    videoStream.on("data", (chunk) => {
-      downloadedBytes += chunk.length;
-      bufferStream.write(chunk);
-
-      // Approximate progress update every ~5%
-      const percent = Math.min(99, Math.floor((downloadedBytes / (1024 * 1024 * 50)) * 100));
-      if (percent % 5 === 0) {
-        bot.editMessageText(`📥 Downloading "${title}"... ${percent}%`, {
-          chat_id: chatId,
-          message_id: statusMessage.message_id,
-        }).catch(() => {});
-      }
+  if (fileSize <= 50 * 1024 * 1024) {
+    videoStream.on('error', (err) => {
+      console.error('Download error:', err);
+      bot.sendMessage(chatId, '⚠️ Failed to download the video. Please check the link or try again later.');
     });
 
-    videoStream.on("end", async () => {
-      bufferStream.end();
-      const buffer = bufferStream.getContents();
-      if (!buffer) return bot.sendMessage(chatId, "⚠️ Failed to process video.");
+    videoStream.pipe(res);
+  } else {
+    const filePath = path.join(__dirname, `${title}.mp4`);
+    const fileStream = fs.createWriteStream(filePath);
 
-      const sizeMB = buffer.length / (1024 * 1024);
-
-      const readableStream = new streamBuffers.ReadableStreamBuffer();
-      readableStream.put(buffer);
-      readableStream.stop();
-
-      if (sizeMB <= 50) {
-        await bot.sendVideo(chatId, readableStream, { caption: title });
-      } else if (sizeMB <= 2048) {
-        const type = await FileType.fromBuffer(buffer);
-        await bot.sendDocument(chatId, readableStream, {}, { filename: `${title}.${type?.ext || "mp4"}` });
-      } else {
-        await bot.sendMessage(chatId, "⚠️ Video too large (>2GB). Sending audio-only version...");
-
-        const audioStream = ytdl(url, { filter: "audioonly", quality: "highestaudio" });
-        const audioBufferStream = new streamBuffers.WritableStreamBuffer();
-
-        audioStream.pipe(audioBufferStream);
-
-        audioStream.on("end", async () => {
-          const audioBuffer = audioBufferStream.getContents();
-          if (!audioBuffer) return bot.sendMessage(chatId, "⚠️ Failed to process audio.");
-
-          const readableAudioStream = new streamBuffers.ReadableStreamBuffer();
-          readableAudioStream.put(audioBuffer);
-          readableAudioStream.stop();
-
-          await bot.sendAudio(chatId, readableAudioStream, { title: title });
+    videoStream.pipe(fileStream);
+    fileStream.on('finish', () => {
+      bot.sendDocument(chatId, filePath, {}, { filename: `${title}.mp4` })
+        .then(() => {
+          fs.unlinkSync(filePath);
+        })
+        .catch(err => {
+          console.error('Error sending document:', err);
+          bot.sendMessage(chatId, '⚠️ Failed to send the video. Please try again later.');
+          fs.unlinkSync(filePath);
         });
-
-        audioStream.on("error", (err) => {
-          console.error(err);
-          bot.sendMessage(chatId, "⚠️ Failed to download audio-only version.");
-        });
-      }
     });
-
-    videoStream.on("error", (err) => {
-      console.error(err);
-      bot.sendMessage(chatId, "⚠️ Failed to download video.");
-    });
-
-  } catch (err) {
-    console.error(err);
-    bot.sendMessage(chatId, "⚠️ Error processing your request.");
   }
 });
+
+app.listen(port, () => {
+  console.log(`Server is running on port ${port}`);
+});
+
+async function getFileSize(stream) {
+  const passThrough = new PassThrough();
+  let size = 0;
+
+  stream.pipe(passThrough);
+  passThrough.on('data', chunk => {
+    size += chunk.length;
+  });
+
+  return new Promise((resolve, reject) => {
+    passThrough.on('end', () => resolve(size));
+    passThrough.on('error', reject);
+  });
+}
