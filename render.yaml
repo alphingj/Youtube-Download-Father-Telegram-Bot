@@ -1,0 +1,12 @@
+services:
+  - type: web
+    name: youtube-downloader-bot
+    env: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: NODE_VERSION
+        value: 18.17.0
