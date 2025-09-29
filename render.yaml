@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: youtube-downloader-bot-v2
+    name: youtube-downloader-bot
     env: python
     plan: free
     buildCommand: pip install -r requirements.txt
