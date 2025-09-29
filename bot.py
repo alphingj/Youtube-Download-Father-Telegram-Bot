@@ -221,14 +221,14 @@ def webhook():
     return "OK", 200
 
 def keep_alive():
-    """Ping the service every 14 minutes to prevent spindown"""
+    """Ping the service every 49 seconds to prevent spindown"""
     if not WEBHOOK_URL:
         logger.warning("WEBHOOK_URL not set. Self-ping disabled.")
         return
     
     while True:
         try:
-            time.sleep(840)  # 14 minutes
+            time.sleep(49)  # 49 seconds
             response = requests.get(f"{WEBHOOK_URL}/health", timeout=10)
             logger.info(f"Self-ping: {response.status_code}")
         except Exception as e:
