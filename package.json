@@ -1,13 +1,16 @@
 {
   "name": "youtube-telegram-bot",
-  "version": "1.0.0",
-  "description": "Telegram bot for YouTube download with Render + UptimeRobot keep-alive",
+  "version": "1.4.0",
+  "description": "Telegram bot for streaming YouTube videos/audio directly to Telegram",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
     "express": "^4.19.2",
-    "node-telegram-bot-api": "^0.63.0"
+    "node-telegram-bot-api": "^0.63.0",
+    "ytdl-core": "^4.11.1",
+    "file-type": "^18.0.0",
+    "stream-buffers": "^3.0.2"
   }
 }
