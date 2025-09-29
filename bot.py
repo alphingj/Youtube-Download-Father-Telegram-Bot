@@ -18,10 +18,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Configuration
+# Configuration - CRITICAL: Get PORT from environment
 BOT_TOKEN = os.environ.get("BOT_TOKEN")
 WEBHOOK_URL = os.environ.get("WEBHOOK_URL")
-PORT = int(os.environ.get("PORT", 10000))
+PORT = int(os.environ.get("PORT", 10000))  # Render provides PORT automatically
 
 # Flask app
 app = Flask(__name__)
@@ -38,7 +38,6 @@ def is_rate_limited(user_id: int) -> bool:
     if user_id_str not in user_requests:
         user_requests[user_id_str] = []
     
-    # Clean old requests
     user_requests[user_id_str] = [t for t in user_requests[user_id_str] if now - t < 60]
     
     if len(user_requests[user_id_str]) >= 3:
@@ -68,11 +67,6 @@ Send me a YouTube URL and I'll download it for you!
 • Smart file size handling
 • Fast and reliable
 
-📊 *File Limits:*
-• <50MB → Sent as video
-• 50MB-2GB → Sent as document
-• >2GB → Audio only
-
 Just send me a YouTube link to get started!
     """
     await update.message.reply_text(welcome_text, parse_mode='Markdown')
@@ -94,56 +88,12 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 *Commands:*
 /start - Start the bot
 /help - Show this help
-/stats - Bot statistics
-
-*Rate Limits:*
-• 3 downloads per minute per user
     """
     await update.message.reply_text(help_text, parse_mode='Markdown')
-
-async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle /stats command"""
-    stats_text = f"""
-📊 *Bot Statistics*
-
-*Active Users:* {len(user_requests)}
-*Uptime:* Calculating...
-*Service:* Render
-
-Bot is running smoothly! 🚀
-    """
-    await update.message.reply_text(stats_text, parse_mode='Markdown')
-
-def progress_hook(d, status_message, chat_id):
-    """Progress hook for download updates"""
-    if d['status'] == 'downloading':
-        percent = d.get('_percent_str', '0%')
-        speed = d.get('_speed_str', 'N/A')
-        eta = d.get('_eta_str', 'N/A')
-        
-        # Update status every 5 seconds to avoid spam
-        if '_last_update' not in progress_hook.__dict__:
-            progress_hook._last_update = 0
-        
-        current_time = time.time()
-        if current_time - progress_hook._last_update > 5:
-            asyncio.run_coroutine_threadsafe(
-                update_status_message(status_message, f"📥 Downloading... {percent} | Speed: {speed} | ETA: {eta}"),
-                asyncio.get_event_loop()
-            )
-            progress_hook._last_update = current_time
-
-async def update_status_message(message, text):
-    """Update status message safely"""
-    try:
-        await message.edit_text(text)
-    except Exception as e:
-        logger.error(f"Failed to update status: {e}")
 
 async def download_video(url: str, update: Update):
     """Download and send YouTube video"""
     user_id = update.effective_user.id
-    chat_id = update.effective_chat.id
     
     # Rate limiting check
     if is_rate_limited(user_id):
@@ -160,12 +110,6 @@ async def download_video(url: str, update: Update):
             ydl_info = yt_dlp.YoutubeDL({'quiet': True})
             info = ydl_info.extract_info(url, download=False)
             video_title = info.get('title', 'video')
-            duration = info.get('duration', 0)
-            
-            # Skip if too long (optional safety)
-            if duration > 3600:  # 1 hour
-                await status_msg.edit_text("❌ Video is too long (max 1 hour supported)")
-                return
             
             await status_msg.edit_text("📥 Starting download...")
             
@@ -244,7 +188,6 @@ def home():
             body { font-family: Arial, sans-serif; margin: 40px; background: #f5f5f5; }
             .container { max-width: 800px; margin: 0 auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
             .status { color: #22c55e; font-weight: bold; }
-            .feature { margin: 10px 0; padding: 10px; background: #f8f9fa; border-radius: 5px; }
         </style>
     </head>
     <body>
@@ -252,22 +195,7 @@ def home():
             <h1>🎬 YouTube Downloader Telegram Bot</h1>
             <p class="status">✅ Bot is running successfully!</p>
             <p>This bot allows you to download YouTube videos directly in Telegram.</p>
-            
-            <h3>✨ Features:</h3>
-            <div class="feature">📹 Video downloads (up to 720p)</div>
-            <div class="feature">🎵 Audio extraction</div>
-            <div class="feature">📊 Smart file size handling</div>
-            <div class="feature">⚡ Fast processing</div>
-            
-            <h3>🚀 How to use:</h3>
-            <ol>
-                <li>Start the bot on Telegram: <code>/start</code></li>
-                <li>Send any YouTube URL</li>
-                <li>Wait for processing</li>
-                <li>Receive your file!</li>
-            </ol>
-            
-            <p><strong>Note:</strong> This service respects YouTube's Terms of Service and is intended for personal use.</p>
+            <p><strong>Bot is live and ready to use!</strong></p>
         </div>
     </body>
     </html>
@@ -313,7 +241,6 @@ async def setup_bot():
     # Add handlers
     bot_app.add_handler(CommandHandler("start", start))
     bot_app.add_handler(CommandHandler("help", help_command))
-    bot_app.add_handler(CommandHandler("stats", stats_command))
     bot_app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
     # Initialize
@@ -328,6 +255,11 @@ async def setup_bot():
     else:
         logger.warning("⚠️ WEBHOOK_URL not set - webhook not configured")
 
+def run_flask_app():
+    """Run Flask app separately to ensure port binding"""
+    logger.info(f"🌐 Starting Flask server on port {PORT}")
+    app.run(host='0.0.0.0', port=PORT, debug=False, use_reloader=False)
+
 def main():
     """Main application entry point"""
     logger.info("🚀 Starting YouTube Downloader Bot...")
@@ -340,17 +272,19 @@ def main():
     if not WEBHOOK_URL:
         logger.warning("⚠️ WEBHOOK_URL not set - bot may not work properly")
     
-    # Setup and run bot
-    asyncio.run(setup_bot())
+    # Setup bot in a separate thread to avoid blocking
+    import threading
+    bot_thread = threading.Thread(target=lambda: asyncio.run(setup_bot()))
+    bot_thread.daemon = True
+    bot_thread.start()
     
     # Start keep-alive thread
     keep_alive_thread = Thread(target=keep_alive, daemon=True)
     keep_alive_thread.start()
     logger.info("✅ Keep-alive thread started")
     
-    # Start Flask server
-    logger.info(f"🌐 Starting Flask server on port {PORT}")
-    app.run(host='0.0.0.0', port=PORT, debug=False)
+    # Start Flask server - THIS IS CRITICAL FOR PORT BINDING
+    run_flask_app()
 
 if __name__ == '__main__':
     main()
