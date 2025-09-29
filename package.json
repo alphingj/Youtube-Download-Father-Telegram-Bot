@@ -1,18 +1,18 @@
 {
-  "name": "telegram-youtube-downloader",
+  "name": "youtube-download-father-telegram-bot",
   "version": "1.0.0",
-  "description": "Advanced YouTube downloader Telegram bot",
+  "description": "YouTube Downloader Telegram Bot",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js",
     "dev": "nodemon bot.js"
   },
   "dependencies": {
-    "telegraf": "^4.12.2",
+    "telegraf": "^4.16.3",
     "ytdl-core": "^4.11.5",
-    "fluent-ffmpeg": "^2.1.2",
     "axios": "^1.6.2",
-    "moment": "^2.29.4",
+    "fluent-ffmpeg": "^2.1.2",
+    "ffmpeg-static": "^5.2.0",
     "fs-extra": "^11.1.1"
   },
   "engines": {
