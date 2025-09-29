@@ -1,5 +1,4 @@
-__pycache__/
-*.py[cod]
-downloads/
+node_modules/
+temp/
 .env
-venv/
+*.log
