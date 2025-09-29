@@ -1,21 +1,13 @@
 {
-  "name": "youtube-download-father-telegram-bot",
+  "name": "youtube-telegram-bot",
   "version": "1.0.0",
-  "description": "YouTube Downloader Telegram Bot",
-  "main": "bot.js",
+  "description": "Telegram bot for YouTube download with Render + UptimeRobot keep-alive",
+  "main": "server.js",
   "scripts": {
-    "start": "node bot.js",
-    "dev": "nodemon bot.js"
+    "start": "node server.js"
   },
   "dependencies": {
-    "telegraf": "^4.16.3",
-    "ytdl-core": "^4.11.5",
-    "axios": "^1.6.2",
-    "fluent-ffmpeg": "^2.1.2",
-    "ffmpeg-static": "^5.2.0",
-    "fs-extra": "^11.1.1"
-  },
-  "engines": {
-    "node": ">=16.0.0"
+    "express": "^4.19.2",
+    "node-telegram-bot-api": "^0.63.0"
   }
 }
